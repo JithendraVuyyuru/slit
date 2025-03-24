@@ -1,12 +1,17 @@
 import React, { useState, useEffect, createContext, useContext } from "react";
 import { HashRouter as Router, Routes, Route, NavLink, useLocation, useNavigate } from "react-router-dom";
+import axios from "axios";
 import "./styles.css";
+import GoogleLoginComponent from "./GoogleLogin";
 
 // Font Awesome imports
 import { library } from "@fortawesome/fontawesome-svg-core";
 import { faHome, faTasks, faDoorOpen, faBolt, faUsers } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 library.add(faHome, faTasks, faDoorOpen, faBolt, faUsers);
+
+// Export AppContext so it can be imported in GoogleLogin.js
+export const AppContext = createContext();
 
 // Sound effects (using Web Audio API)
 const AudioContext = window.AudioContext || window.webkitAudioContext;
@@ -43,10 +48,6 @@ const playDingSound = () => {
   setTimeout(() => createSound("sine", 1200, 0.3), 100);
 };
 
-// App Context for shared state
-const AppContext = createContext();
-
-const mockFitData = { steps: 7500, workoutMinutes: 20, sleepHours: 6.5 };
 const classes = ["Tank", "Assassin", "Mage", "Healer"];
 const avatarStages = ["E-Rank Weakling", "C-Rank Shadow", "S-Rank Monarch"];
 const motivations = [
@@ -148,6 +149,18 @@ export default function App() {
       { name: "Hunter B", level: 2, streak: 3, shadows: 1 }
     ];
   });
+  const [userSteps, setUserSteps] = useState(() => {
+    const saved = localStorage.getItem("userSteps");
+    return saved ? parseInt(saved) : 0;
+  });
+  const [userWorkoutMinutes, setUserWorkoutMinutes] = useState(() => {
+    const saved = localStorage.getItem("userWorkoutMinutes");
+    return saved ? parseInt(saved) : 0;
+  });
+  const [userSleepHours, setUserSleepHours] = useState(() => {
+    const saved = localStorage.getItem("userSleepHours");
+    return saved ? parseFloat(saved) : 0;
+  });
 
   // Persist state to localStorage whenever it changes
   useEffect(() => {
@@ -207,6 +220,77 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem("friends", JSON.stringify(friends));
   }, [friends]);
+  useEffect(() => {
+    localStorage.setItem("userSteps", userSteps);
+  }, [userSteps]);
+  useEffect(() => {
+    localStorage.setItem("userWorkoutMinutes", userWorkoutMinutes);
+  }, [userWorkoutMinutes]);
+  useEffect(() => {
+    localStorage.setItem("userSleepHours", userSleepHours);
+  }, [userSleepHours]);
+
+  // Fetch fitness data from Google Fit
+  const fetchFitnessData = async () => {
+    const token = localStorage.getItem("google_token");
+    if (!token) return;
+
+    try {
+      const now = new Date();
+      const startTime = new Date(now.getTime() - 24 * 60 * 60 * 1000); // Last 24 hours
+      const endTime = now;
+
+      const response = await axios.post(
+        "https://fitness.googleapis.com/fitness/v1/users/me/dataset:aggregate",
+        {
+          aggregateBy: [
+            { dataTypeName: "com.google.step_count.delta" },
+            { dataTypeName: "com.google.activity.segment" },
+            { dataTypeName: "com.google.sleep.segment" },
+          ],
+          bucketByTime: { durationMillis: 86400000 }, // 24 hours
+          startTimeMillis: startTime.getTime(),
+          endTimeMillis: endTime.getTime(),
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      let steps = 0;
+      let workoutMinutes = 0;
+      let sleepHours = 0;
+
+      response.data.bucket.forEach((bucket) => {
+        bucket.dataset.forEach((dataset) => {
+          dataset.point.forEach((point) => {
+            if (dataset.dataSourceId.includes("step_count")) {
+              steps += point.value[0].intVal || 0;
+            } else if (dataset.dataSourceId.includes("activity")) {
+              if (point.value[0].intVal === 7 || point.value[0].intVal === 8) { // Walking or running
+                const duration = (point.endTimeNanos - point.startTimeNanos) / 1e9 / 60;
+                workoutMinutes += duration;
+              }
+            } else if (dataset.dataSourceId.includes("sleep")) {
+              const duration = (point.endTimeNanos - point.startTimeNanos) / 1e9 / 3600;
+              sleepHours += duration;
+            }
+          });
+        });
+      });
+
+      setUserSteps(steps);
+      setUserWorkoutMinutes(Math.round(workoutMinutes));
+      setUserSleepHours(sleepHours);
+      setSystemMessage("System: Fitness data synced successfully!");
+    } catch (error) {
+      console.error("Error fetching fitness data:", error);
+      setSystemMessage("System: Failed to sync fitness data.");
+    }
+  };
 
   // Calculate total power from Shadow Army and equipped items
   const totalPower = shadowArmy.reduce((sum, shadow) => sum + shadow.power, 0) +
@@ -286,22 +370,22 @@ export default function App() {
   useEffect(() => {
     if (!hunterClass) return;
 
-    const sleep = mockFitData.sleepHours;
+    const sleep = userSleepHours;
     const newMana = sleep < 6 ? 50 : sleep >= 8 ? 120 : 100;
     setMana(newMana);
 
     const quests = [
-      { name: "Scout the Perimeter", goal: 5000, current: mockFitData.steps, xp: 10, type: "steps" },
-      { name: "Slay the Dungeon Boss", goal: 30, current: mockFitData.workoutMinutes, xp: 50, type: "workout" },
-      { name: "Rest at the Inn", goal: 7, current: mockFitData.sleepHours, xp: 20, type: "sleep" },
+      { name: "Scout the Perimeter", goal: 5000, current: userSteps, xp: 10, type: "steps" },
+      { name: "Slay the Dungeon Boss", goal: 30, current: userWorkoutMinutes, xp: 50, type: "workout" },
+      { name: "Rest at the Inn", goal: 7, current: userSleepHours, xp: 20, type: "sleep" },
     ];
 
     let completedToday = false;
     quests.forEach((quest) => {
       let achieved = false;
-      if (quest.type === "steps" && mockFitData.steps >= quest.goal) achieved = true;
-      if (quest.type === "workout" && mockFitData.workoutMinutes >= quest.goal) achieved = true;
-      if (quest.type === "sleep" && mockFitData.sleepHours >= quest.goal) achieved = true;
+      if (quest.type === "steps" && userSteps >= quest.goal) achieved = true;
+      if (quest.type === "workout" && userWorkoutMinutes >= quest.goal) achieved = true;
+      if (quest.type === "sleep" && userSleepHours >= quest.goal) achieved = true;
 
       if (achieved && !completedQuests.includes(quest.name)) {
         setSystemMessage(`System: ${quest.name} completed! +${quest.xp} XP`);
@@ -328,8 +412,7 @@ export default function App() {
     if (completedToday) setStreak((prev) => prev + 1);
 
     if (gateActive) {
-      // Adjust steps with totalPower multiplier (e.g., 1% bonus per power point)
-      const effectiveSteps = mockFitData.steps * (1 + totalPower / 100);
+      const effectiveSteps = userSteps * (1 + totalPower / 100);
       setGateProgress(Math.round(effectiveSteps));
       if (effectiveSteps >= 15000) {
         setSystemMessage("System: Gate Cleared! +100 XP");
@@ -344,12 +427,11 @@ export default function App() {
       }, 5000);
     }
 
-    // Countdown timer
     const timer = setInterval(() => {
       setTimeLeft((prev) => (prev > 0 ? prev - 1 : 0));
     }, 1000);
     return () => clearInterval(timer);
-  }, [gateActive, completedQuests, level, hunterClass]);
+  }, [gateActive, completedQuests, level, hunterClass, userSteps, userWorkoutMinutes, userSleepHours]);
 
   // Shadow Army summoning
   const summonShadow = () => {
@@ -484,7 +566,14 @@ export default function App() {
         friends,
         addFriend,
         avatarStages,
-        totalPower
+        totalPower,
+        fetchFitnessData,
+        userSteps,
+        setUserSteps,
+        userWorkoutMinutes,
+        setUserWorkoutMinutes,
+        userSleepHours,
+        setUserSleepHours
       }}
     >
       <Router>
@@ -580,28 +669,62 @@ function HomePage() {
           </div>
         </div>
       </div>
+      <div className="google-login">
+        <h3>Sync Fitness Data</h3>
+        <GoogleLoginComponent />
+      </div>
     </div>
   );
 }
 
 // Daily Tasks Page
 function DailyTasksPage() {
-  const { timeLeft, completedQuests, setCompletedQuests } = useContext(AppContext);
+  const { timeLeft, completedQuests, setCompletedQuests, userSteps, setUserSteps, userWorkoutMinutes, setUserWorkoutMinutes, userSleepHours, setUserSleepHours, setSystemMessage } = useContext(AppContext);
   const hours = Math.floor(timeLeft / 3600);
   const minutes = Math.floor((timeLeft % 3600) / 60);
   const seconds = timeLeft % 60;
 
   const quests = [
-    { name: "Scout the Perimeter", goal: 5000, current: mockFitData.steps, xp: 10, type: "steps" },
-    { name: "Slay the Dungeon Boss", goal: 30, current: mockFitData.workoutMinutes, xp: 50, type: "workout" },
-    { name: "Rest at the Inn", goal: 7, current: mockFitData.sleepHours, xp: 20, type: "sleep" },
+    { name: "Scout the Perimeter", goal: 5000, current: userSteps, xp: 10, type: "steps" },
+    { name: "Slay the Dungeon Boss", goal: 30, current: userWorkoutMinutes, xp: 50, type: "workout" },
+    { name: "Rest at the Inn", goal: 7, current: userSleepHours, xp: 20, type: "sleep" },
   ];
+
+  const handleManualInput = (e) => {
+    e.preventDefault();
+    const steps = parseInt(e.target.steps.value) || 0;
+    const workoutMinutes = parseInt(e.target.workoutMinutes.value) || 0;
+    const sleepHours = parseFloat(e.target.sleepHours.value) || 0;
+
+    setUserSteps(steps);
+    setUserWorkoutMinutes(workoutMinutes);
+    setUserSleepHours(sleepHours);
+    setSystemMessage("System: Fitness data updated manually!");
+  };
 
   return (
     <div className="page">
       <div className="quest-board">
         <h2 className="section-title">Daily Missions</h2>
         <p className="timer">Time Left: {hours}h {minutes}m {seconds}s</p>
+        <div className="manual-input">
+          <h3>Manual Fitness Input</h3>
+          <form onSubmit={handleManualInput}>
+            <label>
+              Steps:
+              <input type="number" name="steps" defaultValue={userSteps} min="0" />
+            </label>
+            <label>
+              Workout Minutes:
+              <input type="number" name="workoutMinutes" defaultValue={userWorkoutMinutes} min="0" />
+            </label>
+            <label>
+              Sleep Hours:
+              <input type="number" name="sleepHours" defaultValue={userSleepHours} min="0" step="0.1" />
+            </label>
+            <button type="submit">Update</button>
+          </form>
+        </div>
         <ul>
           {quests.map((quest) => (
             <li key={quest.name} className={completedQuests.includes(quest.name) ? "completed" : ""}>
@@ -635,8 +758,8 @@ function DailyTasksPage() {
 
 // Gates Page
 function GatesPage() {
-  const { gateActive, gateProgress, setSystemMessage, totalPower } = useContext(AppContext);
-  const effectiveSteps = mockFitData.steps * (1 + totalPower / 100);
+  const { gateActive, gateProgress, setSystemMessage, totalPower, userSteps } = useContext(AppContext);
+  const effectiveSteps = userSteps * (1 + totalPower / 100);
 
   return (
     <div className="page">
