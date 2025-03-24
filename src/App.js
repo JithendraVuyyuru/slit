@@ -277,7 +277,7 @@ export default function App() {
       setTimeout(() => {
         setBootComplete(true);
         setTutorialStep(1); // Start tutorial after boot-up
-        setSystemMessage("System: Welcome, Hunter U.");
+        setSystemMessage(`System: Welcome, ${hunterName}.`);
       }, 3000);
     }
   }, [hunterClass, bootComplete]);
