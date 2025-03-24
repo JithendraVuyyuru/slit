@@ -1,5 +1,5 @@
 import React, { useState, useEffect, createContext, useContext } from "react";
-import { BrowserRouter as Router, Routes, Route, NavLink, useLocation, useNavigate } from "react-router-dom";
+import { HashRouter as Router, Routes, Route, NavLink, useLocation, useNavigate } from "react-router-dom";
 import "./styles.css";
 
 // Font Awesome imports
@@ -63,35 +63,150 @@ const nameText = "Hunter, what is your name? Choose your path?";
 
 // App Component (Root)
 export default function App() {
-  const [xp, setXp] = useState(21);
-  const [level, setLevel] = useState(1);
-  const [hunterClass, setHunterClass] = useState(null);
-  const [hunterName, setHunterName] = useState("");
-  const [mana, setMana] = useState(100);
-  const [gateActive, setGateActive] = useState(false);
-  const [gateProgress, setGateProgress] = useState(0);
-  const [completedQuests, setCompletedQuests] = useState([]);
-  const [streak, setStreak] = useState(2);
-  const [shadowAwakened, setShadowAwakened] = useState(false);
-  const [introComplete, setIntroComplete] = useState(false);
-  const [showModal, setShowModal] = useState(false);
+  // Initialize state with values from localStorage if available
+  const [xp, setXp] = useState(() => {
+    const saved = localStorage.getItem("xp");
+    return saved ? parseInt(saved) : 21;
+  });
+  const [level, setLevel] = useState(() => {
+    const saved = localStorage.getItem("level");
+    return saved ? parseInt(saved) : 1;
+  });
+  const [hunterClass, setHunterClass] = useState(() => {
+    return localStorage.getItem("hunterClass") || null;
+  });
+  const [hunterName, setHunterName] = useState(() => {
+    return localStorage.getItem("hunterName") || "";
+  });
+  const [mana, setMana] = useState(() => {
+    const saved = localStorage.getItem("mana");
+    return saved ? parseInt(saved) : 100;
+  });
+  const [gateActive, setGateActive] = useState(() => {
+    const saved = localStorage.getItem("gateActive");
+    return saved ? JSON.parse(saved) : false;
+  });
+  const [gateProgress, setGateProgress] = useState(() => {
+    const saved = localStorage.getItem("gateProgress");
+    return saved ? parseInt(saved) : 0;
+  });
+  const [completedQuests, setCompletedQuests] = useState(() => {
+    const saved = localStorage.getItem("completedQuests");
+    return saved ? JSON.parse(saved) : [];
+  });
+  const [streak, setStreak] = useState(() => {
+    const saved = localStorage.getItem("streak");
+    return saved ? parseInt(saved) : 2;
+  });
+  const [shadowAwakened, setShadowAwakened] = useState(() => {
+    const saved = localStorage.getItem("shadowAwakened");
+    return saved ? JSON.parse(saved) : false;
+  });
+  const [introComplete, setIntroComplete] = useState(() => {
+    const saved = localStorage.getItem("introComplete");
+    return saved ? JSON.parse(saved) : false;
+  });
+  const [showModal, setShowModal] = useState(() => {
+    const saved = localStorage.getItem("showModal");
+    return saved ? JSON.parse(saved) : false;
+  });
   const [currentText, setCurrentText] = useState("");
   const [awakenFlash, setAwakenFlash] = useState(false);
-  const [namePhase, setNamePhase] = useState(false);
-  const [timeLeft, setTimeLeft] = useState(86377); // 23h 59m 37s
+  const [namePhase, setNamePhase] = useState(() => {
+    const saved = localStorage.getItem("namePhase");
+    return saved ? JSON.parse(saved) : false;
+  });
+  const [timeLeft, setTimeLeft] = useState(() => {
+    const saved = localStorage.getItem("timeLeft");
+    return saved ? parseInt(saved) : 86377; // 23h 59m 37s
+  });
   const [systemMessage, setSystemMessage] = useState("");
   const [systemMessageText, setSystemMessageText] = useState("");
-  const [bootComplete, setBootComplete] = useState(false);
-  const [tutorialStep, setTutorialStep] = useState(0);
-  const [shadowArmy, setShadowArmy] = useState([]);
-  const [equipment, setEquipment] = useState([
-    { name: "Iron Sword", power: 10, equipped: false },
-    { name: "Leather Armor", power: 5, equipped: false }
-  ]);
-  const [friends, setFriends] = useState([
-    { name: "Hunter A", level: 3, streak: 5, shadows: 2 },
-    { name: "Hunter B", level: 2, streak: 3, shadows: 1 }
-  ]);
+  const [bootComplete, setBootComplete] = useState(() => {
+    const saved = localStorage.getItem("bootComplete");
+    return saved ? JSON.parse(saved) : false;
+  });
+  const [tutorialStep, setTutorialStep] = useState(() => {
+    const saved = localStorage.getItem("tutorialStep");
+    return saved ? parseInt(saved) : 0;
+  });
+  const [shadowArmy, setShadowArmy] = useState(() => {
+    const saved = localStorage.getItem("shadowArmy");
+    return saved ? JSON.parse(saved) : [];
+  });
+  const [equipment, setEquipment] = useState(() => {
+    const saved = localStorage.getItem("equipment");
+    return saved ? JSON.parse(saved) : [
+      { name: "Iron Sword", power: 10, equipped: false },
+      { name: "Leather Armor", power: 5, equipped: false }
+    ];
+  });
+  const [friends, setFriends] = useState(() => {
+    const saved = localStorage.getItem("friends");
+    return saved ? JSON.parse(saved) : [
+      { name: "Hunter A", level: 3, streak: 5, shadows: 2 },
+      { name: "Hunter B", level: 2, streak: 3, shadows: 1 }
+    ];
+  });
+
+  // Persist state to localStorage whenever it changes
+  useEffect(() => {
+    localStorage.setItem("xp", xp);
+  }, [xp]);
+  useEffect(() => {
+    localStorage.setItem("level", level);
+  }, [level]);
+  useEffect(() => {
+    if (hunterClass) localStorage.setItem("hunterClass", hunterClass);
+  }, [hunterClass]);
+  useEffect(() => {
+    if (hunterName) localStorage.setItem("hunterName", hunterName);
+  }, [hunterName]);
+  useEffect(() => {
+    localStorage.setItem("mana", mana);
+  }, [mana]);
+  useEffect(() => {
+    localStorage.setItem("gateActive", JSON.stringify(gateActive));
+  }, [gateActive]);
+  useEffect(() => {
+    localStorage.setItem("gateProgress", gateProgress);
+  }, [gateProgress]);
+  useEffect(() => {
+    localStorage.setItem("completedQuests", JSON.stringify(completedQuests));
+  }, [completedQuests]);
+  useEffect(() => {
+    localStorage.setItem("streak", streak);
+  }, [streak]);
+  useEffect(() => {
+    localStorage.setItem("shadowAwakened", JSON.stringify(shadowAwakened));
+  }, [shadowAwakened]);
+  useEffect(() => {
+    localStorage.setItem("introComplete", JSON.stringify(introComplete));
+  }, [introComplete]);
+  useEffect(() => {
+    localStorage.setItem("showModal", JSON.stringify(showModal));
+  }, [showModal]);
+  useEffect(() => {
+    localStorage.setItem("namePhase", JSON.stringify(namePhase));
+  }, [namePhase]);
+  useEffect(() => {
+    localStorage.setItem("timeLeft", timeLeft);
+  }, [timeLeft]);
+  useEffect(() => {
+    localStorage.setItem("bootComplete", JSON.stringify(bootComplete));
+  }, [bootComplete]);
+  useEffect(() => {
+    localStorage.setItem("tutorialStep", tutorialStep);
+  }, [tutorialStep]);
+  useEffect(() => {
+    localStorage.setItem("shadowArmy", JSON.stringify(shadowArmy));
+  }, [shadowArmy]);
+  useEffect(() => {
+    localStorage.setItem("equipment", JSON.stringify(equipment));
+  }, [equipment]);
+  useEffect(() => {
+    localStorage.setItem("friends", JSON.stringify(friends));
+  }, [friends]);
 
   // Calculate total power from Shadow Army and equipped items
   const totalPower = shadowArmy.reduce((sum, shadow) => sum + shadow.power, 0) +
@@ -431,10 +546,10 @@ function HomePage() {
       <div className="motivation-ticker">
         <div className="ticker-content">
           {motivations.map((msg, index) => (
-            <span key={index}>{msg} &nbsp;&nbsp;&nbsp;</span>
+            <span key={index}>{msg}    </span>
           ))}
           {motivations.map((msg, index) => (
-            <span key={`repeat-${index}`}>{msg} &nbsp;&nbsp;&nbsp;</span>
+            <span key={`repeat-${index}`}>{msg}    </span>
           ))}
         </div>
       </div>
@@ -640,7 +755,7 @@ function FriendsPage() {
 function TutorialOverlay() {
   const { tutorialStep, setTutorialStep } = useContext(AppContext);
   const location = useLocation();
-  const navigate = useNavigate(); // Use useNavigate for navigation
+  const navigate = useNavigate();
 
   // Redirect to the correct page for each tutorial step without reloading
   useEffect(() => {
